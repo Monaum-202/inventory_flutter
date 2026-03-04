@@ -93,7 +93,6 @@ class _MainApp extends ConsumerWidget {
     );
   }
 
-  /// Build navigation drawer for mobile
   Widget _buildNavigationDrawer(BuildContext context, WidgetRef ref) {
     return ProfessionalNavigationSidebar(
       modules: defaultNavigationModules,
