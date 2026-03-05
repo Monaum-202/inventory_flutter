@@ -7,8 +7,7 @@ import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'features/inventory/presentation/pages/inventory_page.dart';
 import 'features/reports/presentation/pages/reports_page.dart';
 import 'core/themes/app_theme.dart';
-import 'core/navigation/professional_sidebar.dart';
-import 'core/navigation/navigation_model.dart';
+import 'core/widgets/app_drawer.dart';
 
 void main() {
   runApp(const ProviderScope(child: InventoryApp()));
@@ -30,6 +29,12 @@ class InventoryApp extends StatelessWidget {
   }
 }
 
+/// Page index provider for navigation
+final pageIndexProvider = StateProvider<int>((ref) => 0);
+
+/// Reports sub index provider
+final reportsSubIndexProvider = StateProvider<int>((ref) => 0);
+
 /// Decides whether to show login or the main app based on auth state.
 class _RootNavigator extends ConsumerWidget {
   const _RootNavigator({super.key});
@@ -43,13 +48,10 @@ class _RootNavigator extends ConsumerWidget {
       return const LoginPage();
     }
 
-    // Show main app if authenticated
+    // Show dashboard directly if authenticated
     return const _MainApp();
   }
 }
-
-/// Page state provider to track which page to display
-final pageIndexProvider = StateProvider<int>((ref) => 0);
 
 class _MainApp extends ConsumerWidget {
   const _MainApp({super.key});
@@ -57,76 +59,35 @@ class _MainApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pageIndex = ref.watch(pageIndexProvider);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
-
-    // Define pages in order
-    final pages = [
-      const DashboardPage(),
-      const InventoryPage(),
-      const ReportsPage(),
-    ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rapid Global Inventory'),
-        elevation: 0,
+        title: Text(_getAppBarTitle(pageIndex)),
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
       ),
-      drawer: isMobile
-          ? _buildNavigationDrawer(context, ref)
-          : null,
-      body: isMobile
-          ? pages[pageIndex]
-          : Row(
-              children: [
-                ProfessionalNavigationSidebar(
-                  modules: defaultNavigationModules,
-                  onMenuSelected: (menu) {
-                    _handleMenuSelection(menu, ref);
-                  },
-                ),
-                Expanded(
-                  child: pages[pageIndex],
-                ),
-              ],
-            ),
+      drawer: AppDrawer(),
+      body: IndexedStack(
+        index: pageIndex,
+        children: const [
+          DashboardPage(),
+          InventoryPage(),
+          ReportsPage(),
+        ],
+      ),
     );
   }
 
-  Widget _buildNavigationDrawer(BuildContext context, WidgetRef ref) {
-    return ProfessionalNavigationSidebar(
-      modules: defaultNavigationModules,
-      onMenuSelected: (menu) {
-        Navigator.pop(context); // Close drawer
-        _handleMenuSelection(menu, ref);
-      },
-    );
-  }
-
-  /// Handle menu selection - map routes to page indices
-  void _handleMenuSelection(NavigationMenu menu, WidgetRef ref) {
-    switch (menu.route) {
-      case '/':
-      case '/dashboard':
-        ref.read(pageIndexProvider.notifier).state = 0;
-        break;
-      case '/inventory':
-      case '/categories':
-      case '/stock':
-        ref.read(pageIndexProvider.notifier).state = 1;
-        break;
-      case '/reports/sales':
-      case '/reports/inventory':
-      case '/export':
-        ref.read(pageIndexProvider.notifier).state = 2;
-        break;
+  String _getAppBarTitle(int index) {
+    switch (index) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Inventory';
+      case 2:
+        return 'Reports';
       default:
-        ref.read(pageIndexProvider.notifier).state = 0;
+        return 'Inventory App';
     }
   }
 }
-
-// Additional feature entry points and providers live inside the feature
-// directories under `lib/features`. Maintain a clear separation between
-// presentation, domain, and data layers as recommended by the Clean
-// Architecture pattern.

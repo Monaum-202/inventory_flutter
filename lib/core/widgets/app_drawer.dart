@@ -37,7 +37,6 @@ class AppDrawer extends ConsumerWidget {
             title: const Text('Dashboard'),
             onTap: () {
               ref.read(pageIndexProvider.notifier).state = 0;
-              Navigator.of(context).pop();
             },
           ),
           ListTile(
@@ -45,16 +44,45 @@ class AppDrawer extends ConsumerWidget {
             title: const Text('Inventory'),
             onTap: () {
               ref.read(pageIndexProvider.notifier).state = 1;
-              Navigator.of(context).pop();
             },
           ),
-          ListTile(
+          ExpansionTile(
             leading: const Icon(Icons.picture_as_pdf),
             title: const Text('Reports'),
-            onTap: () {
-              ref.read(pageIndexProvider.notifier).state = 2;
-              Navigator.of(context).pop();
-            },
+            children: [
+              ListTile(
+                leading: const Icon(Icons.inventory_2),
+                title: const Text('Inventory Report'),
+                onTap: () {
+                  ref.read(pageIndexProvider.notifier).state = 2;
+                  ref.read(reportsSubIndexProvider.notifier).state = 0;
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.shopping_cart),
+                title: const Text('Purchase Report'),
+                onTap: () {
+                  ref.read(pageIndexProvider.notifier).state = 2;
+                  ref.read(reportsSubIndexProvider.notifier).state = 1;
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.sell),
+                title: const Text('Sales Report'),
+                onTap: () {
+                  ref.read(pageIndexProvider.notifier).state = 2;
+                  ref.read(reportsSubIndexProvider.notifier).state = 2;
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.attach_money),
+                title: const Text('Income Report'),
+                onTap: () {
+                  ref.read(pageIndexProvider.notifier).state = 2;
+                  ref.read(reportsSubIndexProvider.notifier).state = 3;
+                },
+              ),
+            ],
           ),
           const Divider(),
           ListTile(
