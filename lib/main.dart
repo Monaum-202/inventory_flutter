@@ -63,8 +63,29 @@ class _MainApp extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(_getAppBarTitle(pageIndex)),
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: const Color(0xFF000000),
         foregroundColor: Colors.white,
+        toolbarHeight: 70,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () {
+              // TODO: Implement notifications
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications coming soon!')),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () {
+              // TODO: Implement profile
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Profile coming soon!')),
+              );
+            },
+          ),
+        ],
       ),
       drawer: AppDrawer(),
       body: IndexedStack(
