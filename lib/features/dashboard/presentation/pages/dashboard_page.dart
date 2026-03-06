@@ -18,45 +18,18 @@ class DashboardPage extends ConsumerWidget {
     final revenueAsync = ref.watch(dashboardRevenueProvider(selectedPeriod));
 
     return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Dashboard',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF111827),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Business overview',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade400,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Period Filter with Refresh ────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _PeriodFilter(selectedPeriod: selectedPeriod, ref: ref),
               _RefreshButton(period: selectedPeriod),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // ── Period Filter ────────────────────────────────────────
-          _PeriodFilter(selectedPeriod: selectedPeriod, ref: ref),
           const SizedBox(height: 16),
 
           // ── Metrics ──────────────────────────────────────────────
@@ -212,7 +185,10 @@ class DashboardPage extends ConsumerWidget {
                 children: [
                   // Summary row
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF16A34A).withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(10),
@@ -230,7 +206,8 @@ class DashboardPage extends ConsumerWidget {
                         ),
                         Text(
                           revenue.categoryBreakdown.isNotEmpty
-                              ? revenue.categoryBreakdown[0].amount.toStringAsFixed(2)
+                              ? revenue.categoryBreakdown[0].amount
+                                    .toStringAsFixed(2)
                               : '0.00',
                           style: const TextStyle(
                             fontSize: 15,
@@ -254,7 +231,9 @@ class DashboardPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ...revenue.categoryBreakdown.map((cat) => _CategoryRow(cat: cat)),
+                    ...revenue.categoryBreakdown.map(
+                      (cat) => _CategoryRow(cat: cat),
+                    ),
                   ],
                 ],
               ),
@@ -320,11 +299,7 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
   final Widget? trailing;
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -393,10 +368,7 @@ class _CategoryRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 cat.categoryName,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
             ],
           ),
@@ -435,7 +407,8 @@ class _PeriodFilter extends StatelessWidget {
         children: periods.map((period) {
           final selected = selectedPeriod == period;
           return GestureDetector(
-            onTap: () => ref.read(selectedPeriodProvider.notifier).state = period,
+            onTap: () =>
+                ref.read(selectedPeriodProvider.notifier).state = period,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -448,7 +421,7 @@ class _PeriodFilter extends StatelessWidget {
                           color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
-                        )
+                        ),
                       ]
                     : null,
               ),
@@ -459,7 +432,9 @@ class _PeriodFilter extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
-                  color: selected ? const Color(0xFF111827) : Colors.grey.shade400,
+                  color: selected
+                      ? const Color(0xFF111827)
+                      : Colors.grey.shade400,
                 ),
               ),
             ),
@@ -498,7 +473,11 @@ class _ErrorMessage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded, size: 16, color: Colors.red.shade300),
+          Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: Colors.red.shade300,
+          ),
           const SizedBox(width: 6),
           Text(
             message,

@@ -90,11 +90,7 @@ class _MainApp extends ConsumerWidget {
       drawer: AppDrawer(),
       body: IndexedStack(
         index: pageIndex,
-        children: const [
-          DashboardPage(),
-          InventoryPage(),
-          ReportsPage(),
-        ],
+        children: const [DashboardPage(), InventoryPage(), ReportsPage()],
       ),
     );
   }
