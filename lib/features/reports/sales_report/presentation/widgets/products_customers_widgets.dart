@@ -16,110 +16,133 @@ class ProductsViewWidget extends ConsumerWidget {
     final pp = ref.watch(salesReportProvider).productPerformance;
     if (pp == null) return const SizedBox.shrink();
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ─── Summary Strip ─────────────────────────────────────
+        Row(children: [
+          _MiniStat(
+              label: 'Products',
+              value: '${pp.summary.totalUniqueProducts}',
+              color: const Color(0xFF4C9EFF)),
+          const SizedBox(width: 8),
+          _MiniStat(
+              label: 'Items Sold',
+              value: '${pp.summary.totalQuantitySold}',
+              color: const Color(0xFFFF9F43)),
+          const SizedBox(width: 8),
+          _MiniStat(
+              label: 'Revenue',
+              value: _compact(pp.summary.totalRevenue),
+              color: const Color(0xFF00C896)),
+        ]),
+        const SizedBox(height: 12),
+
+        // ─── Product Cards ─────────────────────────────────────
+        if (pp.topProducts.isEmpty)
+          _EmptyState(icon: Icons.inventory_2_outlined, label: 'No products')
+        else
+          ...pp.topProducts.asMap().entries.map((e) {
+            final p = e.value;
+            final rank = e.key + 1;
+            return _ProductCard(product: p, rank: rank);
+          }),
+      ],
+    );
+  }
+
+  static String _compact(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
+    return NumberFormat('#,##0').format(v);
+  }
+}
+
+class _ProductCard extends StatelessWidget {
+  final dynamic product;
+  final int rank;
+  const _ProductCard({required this.product, required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = product.revenuePercentage as double;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  const Icon(Icons.inventory_2_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Text('Top Selling Products',
-                      style: Theme.of(context).textTheme.titleMedium),
-                ]),
-                Wrap(spacing: 16, children: [
-                  _Stat(
-                      label: 'Products',
-                      value: '${pp.summary.totalUniqueProducts}'),
-                  _Stat(
-                      label: 'Items Sold',
-                      value: '${pp.summary.totalQuantitySold}'),
-                  _Stat(
-                      label: 'Revenue',
-                      value: _currency(pp.summary.totalRevenue)),
-                ]),
-              ],
+          Row(children: [
+            _RankBadge(rank: rank),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(product.itemName,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            Text(
+              NumberFormat('#,##0.00').format(product.totalRevenue),
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF00C896)),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (pct / 100).clamp(0.0, 1.0),
+              backgroundColor: Colors.grey.shade100,
+              valueColor: AlwaysStoppedAnimation(
+                  _rankColor(rank).withOpacity(0.7)),
+              minHeight: 5,
             ),
           ),
-          const Divider(height: 1),
-
-          // Table
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor:
-                  WidgetStatePropertyAll(Colors.grey.shade50),
-              columns: const [
-                DataColumn(label: Text('Rank')),
-                DataColumn(label: Text('Product')),
-                DataColumn(label: Text('Qty Sold'), numeric: true),
-                DataColumn(label: Text('Revenue'), numeric: true),
-                DataColumn(label: Text('Avg Price'), numeric: true),
-                DataColumn(label: Text('Orders'), numeric: true),
-                DataColumn(label: Text('% of Total'), numeric: true),
-              ],
-              rows: pp.topProducts.isEmpty
-                  ? [
-                      DataRow(cells: [
-                        DataCell(SizedBox(
-                          width: 500,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.inbox,
-                                    size: 40, color: Colors.grey.shade400),
-                                const SizedBox(height: 8),
-                                const Text('No products found'),
-                              ],
-                            ),
-                          ),
-                        )),
-                        ...List.generate(6, (_) => const DataCell(SizedBox())),
-                      ]),
-                    ]
-                  : pp.topProducts.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final p = entry.value;
-                      return DataRow(cells: [
-                        DataCell(_RankBadge(rank: i + 1)),
-                        DataCell(Text(p.itemName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600))),
-                        DataCell(_ColorBadge(
-                            text: '${p.totalQuantitySold}',
-                            color: Colors.blue)),
-                        DataCell(Text(
-                          _currency(p.totalRevenue),
-                          style: const TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600),
-                        )),
-                        DataCell(Text(_currency(p.averageUnitPrice))),
-                        DataCell(Text('${p.orderCount}')),
-                        DataCell(_ColorBadge(
-                          text:
-                              '${p.revenuePercentage.toStringAsFixed(1)}%',
-                          color: Colors.grey.shade600,
-                        )),
-                      ]);
-                    }).toList(),
-            ),
-          ),
+          const SizedBox(height: 8),
+          // Stats row
+          Row(children: [
+            _Chip(
+                icon: Icons.shopping_bag_rounded,
+                label: '${product.totalQuantitySold} sold',
+                color: const Color(0xFF4C9EFF)),
+            const SizedBox(width: 6),
+            _Chip(
+                icon: Icons.receipt_rounded,
+                label: '${product.orderCount} orders',
+                color: const Color(0xFFFF9F43)),
+            const Spacer(),
+            Text('${pct.toStringAsFixed(1)}% of total',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w600)),
+          ]),
         ],
       ),
     );
   }
 
-  static String _currency(double v) =>
-      NumberFormat('#,##0.00', 'en_US').format(v);
+  Color _rankColor(int r) {
+    if (r == 1) return const Color(0xFFFFD700);
+    if (r == 2) return const Color(0xFFC0C0C0);
+    if (r == 3) return const Color(0xFFCD7F32);
+    return const Color(0xFF4C9EFF);
+  }
 }
 
 // ═════════════════════════════════════════════
@@ -134,117 +157,125 @@ class CustomersViewWidget extends ConsumerWidget {
     final ca = ref.watch(salesReportProvider).customerAnalytics;
     if (ca == null) return const SizedBox.shrink();
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ─── Summary Strip ─────────────────────────────────────
+        _MiniStat(
+            label: 'Total Customers',
+            value: '${ca.summary.totalCustomers}',
+            color: const Color(0xFFA78BFA)),
+        const SizedBox(height: 12),
+
+        // ─── Customer Cards ────────────────────────────────────
+        if (ca.topCustomers.isEmpty)
+          _EmptyState(icon: Icons.people_outline_rounded, label: 'No customers')
+        else
+          ...ca.topCustomers.asMap().entries.map((e) {
+            final c = e.value;
+            final rank = e.key + 1;
+            return _CustomerCard(customer: c, rank: rank);
+          }),
+      ],
+    );
+  }
+
+  static String _currency(double v) =>
+      NumberFormat('#,##0.00', 'en_US').format(v);
+}
+
+class _CustomerCard extends StatelessWidget {
+  final dynamic customer;
+  final int rank;
+  const _CustomerCard({required this.customer, required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final days = customer.daysSinceLastOrder as int;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  const Icon(Icons.people_outline, size: 18),
-                  const SizedBox(width: 8),
-                  Text('Top Customers',
-                      style: Theme.of(context).textTheme.titleMedium),
-                ]),
-                _Stat(
-                    label: 'Total Customers',
-                    value: '${ca.summary.totalCustomers}'),
-              ],
+          // Row 1: Rank + Name + Total Spent
+          Row(children: [
+            _RankBadge(rank: rank),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(customer.customerName,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    if ((customer.companyName ?? '').isNotEmpty)
+                      Text(customer.companyName!,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                  ]),
             ),
-          ),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(
+                NumberFormat('#,##0.00').format(customer.totalSpent),
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF00C896)),
+              ),
+              Text('total spent',
+                  style: TextStyle(
+                      fontSize: 9.5, color: Colors.grey.shade400)),
+            ]),
+          ]),
+
+          const SizedBox(height: 10),
           const Divider(height: 1),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor:
-                  WidgetStatePropertyAll(Colors.grey.shade50),
-              columns: const [
-                DataColumn(label: Text('Rank')),
-                DataColumn(label: Text('Customer')),
-                DataColumn(label: Text('Company')),
-                DataColumn(label: Text('Contact')),
-                DataColumn(label: Text('Orders'), numeric: true),
-                DataColumn(label: Text('Total Spent'), numeric: true),
-                DataColumn(label: Text('Avg Order'), numeric: true),
-                DataColumn(label: Text('Last Order')),
-                DataColumn(label: Text('Days Since'), numeric: true),
-              ],
-              rows: ca.topCustomers.isEmpty
-                  ? [
-                      DataRow(cells: [
-                        DataCell(SizedBox(
-                          width: 600,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.inbox,
-                                    size: 40, color: Colors.grey.shade400),
-                                const SizedBox(height: 8),
-                                const Text('No customers found'),
-                              ],
-                            ),
-                          ),
-                        )),
-                        ...List.generate(8, (_) => const DataCell(SizedBox())),
-                      ]),
-                    ]
-                  : ca.topCustomers.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final c = entry.value;
-                      return DataRow(cells: [
-                        DataCell(_RankBadge(rank: i + 1)),
-                        DataCell(Text(c.customerName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600))),
-                        DataCell(Text(c.companyName ?? '-',
-                            style: const TextStyle(fontSize: 12))),
-                        DataCell(Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(c.phone,
-                                style: const TextStyle(fontSize: 12)),
-                            if (c.email != null)
-                              Text(c.email!,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600)),
-                          ],
-                        )),
-                        DataCell(_ColorBadge(
-                            text: '${c.totalOrders}',
-                            color: Colors.blue)),
-                        DataCell(Text(
-                          _currency(c.totalSpent),
-                          style: const TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600),
-                        )),
-                        DataCell(
-                            Text(_currency(c.averageOrderValue))),
-                        DataCell(Text(_fmtDate(c.lastOrderDate))),
-                        DataCell(_DaysBadge(days: c.daysSinceLastOrder)),
-                      ]);
-                    }).toList(),
-            ),
+          const SizedBox(height: 10),
+
+          // Row 2: Stats chips
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _Chip(
+                  icon: Icons.receipt_outlined,
+                  label: '${customer.totalOrders} orders',
+                  color: const Color(0xFF4C9EFF)),
+              _Chip(
+                  icon: Icons.phone_rounded,
+                  label: customer.phone,
+                  color: Colors.grey.shade600),
+              _Chip(
+                  icon: Icons.event_rounded,
+                  label: _fmtDate(customer.lastOrderDate),
+                  color: const Color(0xFFFF9F43)),
+              _DaysChip(days: days),
+            ],
           ),
         ],
       ),
     );
   }
 
-  static String _currency(double v) =>
-      NumberFormat('#,##0.00', 'en_US').format(v);
-
   static String _fmtDate(String d) {
     final dt = DateTime.tryParse(d);
-    return dt != null ? DateFormat('dd/MM/yyyy').format(dt) : d;
+    return dt != null ? DateFormat('dd MMM yy').format(dt) : d;
   }
 }
 
@@ -252,25 +283,38 @@ class CustomersViewWidget extends ConsumerWidget {
 // Shared sub-widgets
 // ─────────────────────────────────────────────
 
-class _Stat extends StatelessWidget {
+class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
-  const _Stat({required this.label, required this.value});
+  final Color color;
+  const _MiniStat(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        style: Theme.of(context).textTheme.bodySmall,
-        children: [
-          TextSpan(
-              text: value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                  fontSize: 13)),
-          TextSpan(text: ' $label'),
-        ],
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value,
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: color)),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: color.withOpacity(0.7),
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }
@@ -280,56 +324,107 @@ class _RankBadge extends StatelessWidget {
   final int rank;
   const _RankBadge({required this.rank});
 
+  Color get _color {
+    if (rank == 1) return const Color(0xFFFFD700);
+    if (rank == 2) return const Color(0xFF9CA3AF);
+    if (rank == 3) return const Color(0xFFCD7F32);
+    return const Color(0xFF4C9EFF);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 28,
       height: 28,
-      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.blue.shade700,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text('$rank',
-          style: const TextStyle(
-              color: Colors.white,
+          color: _color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8)),
+      alignment: Alignment.center,
+      child: Text('#$rank',
+          style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.bold)),
+              fontWeight: FontWeight.w800,
+              color: _color)),
     );
   }
 }
 
-class _ColorBadge extends StatelessWidget {
-  final String text;
+class _Chip extends StatelessWidget {
+  final IconData icon;
+  final String label;
   final Color color;
-  const _ColorBadge({required this.text, required this.color});
+  const _Chip(
+      {required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11,
+                color: color,
+                fontWeight: FontWeight.w600)),
+      ]),
     );
   }
 }
 
-class _DaysBadge extends StatelessWidget {
+class _DaysChip extends StatelessWidget {
   final int days;
-  const _DaysBadge({required this.days});
+  const _DaysChip({required this.days});
+
+  Color get _color {
+    if (days <= 30) return const Color(0xFF00C896);
+    if (days <= 90) return const Color(0xFFFF9F43);
+    return const Color(0xFFFF5F5F);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = days <= 30
-        ? Colors.green
-        : days <= 90
-            ? Colors.orange
-            : Colors.red;
-    return _ColorBadge(text: '$days days', color: color);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.access_time_rounded, size: 11, color: _color),
+        const SizedBox(width: 4),
+        Text('$days days ago',
+            style: TextStyle(
+                fontSize: 11,
+                color: _color,
+                fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _EmptyState({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(children: [
+          Icon(icon, size: 40, color: Colors.grey.shade300),
+          const SizedBox(height: 8),
+          Text(label,
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+        ]),
+      ),
+    );
   }
 }
