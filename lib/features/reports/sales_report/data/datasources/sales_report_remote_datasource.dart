@@ -17,7 +17,7 @@ class SalesReportRemoteDataSource {
   }) async {
     final params = filter.toQueryParams(page: page, size: size);
     final uri = Uri.parse(
-      '/api/sales-reports',
+      '/api/reports/sales',
     ).replace(queryParameters: params);
     final response = await apiService.get(uri.toString());
     _checkStatus(response);
@@ -53,10 +53,20 @@ class SalesReportRemoteDataSource {
   }
 
   // ─── Export ───────────────────────────────────────────────────
+  // sales_report_remote_datasource.dart
+
   Future<List<int>> exportReport(SalesReportFilter filter) async {
+    final params = {
+      'dateFrom': filter.startDate ?? '',
+      'dateTo': filter.endDate ?? '',
+      'status': filter.status ?? '',
+      'customerName': filter.customerName ?? '',
+    };
+
     final uri = Uri.parse(
-      '/api/sales-reports/export',
-    ).replace(queryParameters: filter.toQueryParams());
+      '/api/reports/sales/pdf',
+    ).replace(queryParameters: params);
+
     final response = await apiService.get(uri.toString());
     _checkStatus(response);
     return response.bodyBytes.toList();

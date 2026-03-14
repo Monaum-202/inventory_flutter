@@ -10,6 +10,7 @@ import 'core/themes/app_theme.dart';
 import 'core/widgets/app_drawer.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: InventoryApp()));
 }
 

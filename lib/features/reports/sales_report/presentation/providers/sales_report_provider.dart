@@ -210,16 +210,17 @@ class SalesReportNotifier extends StateNotifier<SalesReportState> {
     }
   }
 
+  // In SalesReportNotifier
   Future<void> exportReport(Function(List<int>) onSuccess) async {
     state = state.copyWith(isExporting: true, clearError: true);
     try {
       final bytes = await _exportReport(state.filter);
-      onSuccess(bytes);
+      await onSuccess(bytes); // ← await so errors surface
       state = state.copyWith(isExporting: false);
     } catch (e) {
       state = state.copyWith(
         isExporting: false,
-        errorMessage: 'Failed to export report',
+        errorMessage: 'Failed to export PDF: ${e.toString()}',
       );
     }
   }

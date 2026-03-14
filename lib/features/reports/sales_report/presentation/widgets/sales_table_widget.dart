@@ -1,6 +1,12 @@
+// ============================================================
+//  sales_table_widget.dart  —  table + pagination only
+//  Columns: #  Invoice  Customer  Date  Total/Due  Status
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:inventory_app/core/widgets/rg_tokens.dart';
 
 import '../../domain/entities/sales_report_entities.dart';
 import '../providers/sales_report_provider.dart';
@@ -13,176 +19,334 @@ class SalesTableWidget extends ConsumerWidget {
     final state = ref.watch(salesReportProvider);
     final notifier = ref.read(salesReportProvider.notifier);
     final report = state.reportData;
-    if (report == null) return const SizedBox.shrink();
 
-    if (report.salesDetails.isEmpty) {
-      return _EmptyState();
-    }
+    if (report == null) return const SizedBox.shrink();
+    if (report.salesDetails.isEmpty) return const _EmptyState();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ─── Count Banner ──────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4C9EFF).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
+        // ── Table card ─────────────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            color: RgColors.surface,
+            borderRadius: RgRadius.lgAll,
+            border: Border.all(color: RgColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
               ),
-              child: Text(
-                '${report.pagination.totalElements} invoices',
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4C9EFF)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Toolbar
+              _TableToolbar(
+                totalElements: report.pagination.totalElements,
+                pageSize: state.pageSize,
+                onPageSizeChanged: notifier.changePageSize,
               ),
-            ),
-          ]),
+
+              // Column headers
+              const _TableHeader(),
+
+              // Rows
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: report.salesDetails.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: RgColors.border),
+                itemBuilder: (_, i) {
+                  final row = report.salesDetails[i];
+                  final serial = state.currentPage * state.pageSize + i + 1;
+                  return _TableRow(
+                    row: row,
+                    serial: serial,
+                    onTap: () => _showDetail(context, row),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
 
-        // ─── Sale Cards ────────────────────────────────────────
-        ...report.salesDetails.map((sale) => _SaleCard(sale: sale)),
+        const SizedBox(height: 8),
 
-        // ─── Pagination ────────────────────────────────────────
-        _PaginationBar(
-          pagination: report.pagination,
-          pageSize: state.pageSize,
-          currentPage: state.currentPage,
-          onPageChanged: notifier.goToPage,
-          onPreviousPage: notifier.previousPage,
-          onNextPage: notifier.nextPage,
-          onPageSizeChanged: notifier.changePageSize,
-        ),
+        // ── Pagination ─────────────────────────────────────────
+        if (report.pagination.totalPages > 1)
+          _PaginationBar(
+            pagination: report.pagination,
+            pageSize: state.pageSize,
+            currentPage: state.currentPage,
+            onPageChanged: notifier.goToPage,
+            onPreviousPage: notifier.previousPage,
+            onNextPage: notifier.nextPage,
+            onPageSizeChanged: notifier.changePageSize,
+          ),
       ],
+    );
+  }
+
+  void _showDetail(BuildContext context, SaleDetail sale) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _DetailSheet(sale: sale),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-class _SaleCard extends StatelessWidget {
-  final SaleDetail sale;
-  const _SaleCard({required this.sale});
+// ─────────────────────────────────────────────────────────────
+// Toolbar
+// ─────────────────────────────────────────────────────────────
+class _TableToolbar extends StatelessWidget {
+  final int totalElements;
+  final int pageSize;
+  final ValueChanged<int> onPageSizeChanged;
+
+  const _TableToolbar({
+    required this.totalElements,
+    required this.pageSize,
+    required this.onPageSizeChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2))
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: RgColors.border)),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => _showDetail(context),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Row 1: Invoice + Status
-              Row(children: [
-                Text(sale.invoiceNo,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF4C9EFF))),
-                const Spacer(),
-                _StatusBadge(status: sale.status),
-              ]),
-
-              const SizedBox(height: 8),
-
-              // Row 2: Customer + Date
-              Row(children: [
-                const Icon(Icons.person_rounded,
-                    size: 13, color: Colors.grey),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(sale.customerName,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ),
-                Text(_fmtDate(sale.sellDate),
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500)),
-              ]),
-
-              if ((sale.companyName ?? '').isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Row(children: [
-                  const Icon(Icons.business_rounded,
-                      size: 12, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(sale.companyName!,
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ]),
-              ],
-
-              const SizedBox(height: 10),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-
-              // Row 3: Financial summary
-              Row(children: [
-                _FinItem(
-                    label: 'Total',
-                    value: _cur(sale.totalAmount),
-                    color: Colors.black87,
-                    bold: true),
-                const SizedBox(width: 12),
-                _FinItem(
-                    label: 'Paid',
-                    value: _cur(sale.paidAmount),
-                    color: const Color(0xFF00C896)),
-                const SizedBox(width: 12),
-                if (sale.dueAmount > 0)
-                  _FinItem(
-                      label: 'Due',
-                      value: _cur(sale.dueAmount),
-                      color: const Color(0xFFFF5F5F)),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(6),
+      child: Row(
+        children: [
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 12,
+                color: RgColors.muted,
+                fontWeight: FontWeight.w500,
+              ),
+              children: [
+                TextSpan(
+                  text: NumberFormat('#,##0').format(totalElements),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: RgColors.text,
                   ),
-                  child: Text('${sale.totalItems} items',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w600)),
                 ),
-              ]),
-            ],
+                const TextSpan(text: ' records'),
+              ],
+            ),
           ),
-        ),
+          const Spacer(),
+          const Text(
+            'Rows ',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: RgColors.muted,
+            ),
+          ),
+          Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: RgColors.bg,
+              borderRadius: RgRadius.smAll,
+              border: Border.all(color: RgColors.border),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: [25, 50, 100, 200].contains(pageSize) ? pageSize : 25,
+                isDense: true,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: RgColors.text,
+                ),
+                items: [25, 50, 100, 200]
+                    .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                    .toList(),
+                onChanged: (v) => v != null ? onPageSizeChanged(v) : null,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  void _showDetail(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SaleDetailSheet(sale: sale),
+// ─────────────────────────────────────────────────────────────
+// Column header
+// ─────────────────────────────────────────────────────────────
+class _TableHeader extends StatelessWidget {
+  const _TableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: RgColors.tableBg,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: const Row(
+        children: [
+          // Invoice + Customer (combined)
+          Expanded(flex: 5, child: _Th('Invoice / Customer')),
+          // Date
+          Expanded(flex: 3, child: _Th('Date')),
+          // Total
+          Expanded(flex: 3, child: _Th('Total', right: true)),
+          // Status
+          Expanded(flex: 3, child: _Th('Status', center: true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Th extends StatelessWidget {
+  final String text;
+  final bool right;
+  final bool center;
+  const _Th(this.text, {this.right = false, this.center = false});
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text.toUpperCase(),
+    textAlign: right
+        ? TextAlign.right
+        : center
+        ? TextAlign.center
+        : TextAlign.left,
+    style: const TextStyle(
+      fontSize: 9.5,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.5,
+      color: RgColors.muted,
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Data row
+// ─────────────────────────────────────────────────────────────
+class _TableRow extends StatelessWidget {
+  final SaleDetail row;
+  final int serial;
+  final VoidCallback onTap;
+
+  const _TableRow({
+    required this.row,
+    required this.serial,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Invoice No + Customer (stacked, flex 5)
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Invoice pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: RgColors.primary.withOpacity(0.08),
+                      borderRadius: RgRadius.smAll,
+                    ),
+                    child: Text(
+                      row.invoiceNo,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: RgColors.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  // Customer name
+                  Text(
+                    row.customerName,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: RgColors.text,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // Date (flex 3)
+            Expanded(
+              flex: 3,
+              child: Text(
+                _fmtDate(row.sellDate),
+                style: const TextStyle(fontSize: 10.5, color: RgColors.muted),
+              ),
+            ),
+            const SizedBox(width: 4),
+
+            // Total + Due (flex 3)
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _cur(row.totalAmount),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: RgColors.text,
+                    ),
+                  ),
+                  if (row.dueAmount > 0)
+                    Text(
+                      '−${_cur(row.dueAmount)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: RgColors.danger,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // Status (flex 3)
+            Expanded(
+              flex: 3,
+              child: Center(child: _StatusBadge(status: row.status)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -194,85 +358,129 @@ class _SaleCard extends StatelessWidget {
   static String _cur(double v) => NumberFormat('#,##0.00').format(v);
 }
 
-// ─────────────────────────────────────────────
-class _SaleDetailSheet extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────
+// Detail bottom sheet
+// ─────────────────────────────────────────────────────────────
+class _DetailSheet extends StatelessWidget {
   final SaleDetail sale;
-  const _SaleDetailSheet({required this.sale});
+  const _DetailSheet({required this.sale});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: RgColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: RgColors.primary, width: 3)),
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Handle
           Center(
             child: Container(
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2)),
+                color: RgColors.border,
+                borderRadius: RgRadius.fullAll,
+              ),
             ),
           ),
-          Row(children: [
-            Text(sale.invoiceNo,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800)),
-            const Spacer(),
-            _StatusBadge(status: sale.status),
-          ]),
-          const SizedBox(height: 4),
-          Text(
-            '${sale.customerName}${(sale.companyName ?? '').isNotEmpty ? ' · ${sale.companyName}' : ''}',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+
+          // Invoice + status
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: RgColors.primary.withOpacity(0.08),
+                  borderRadius: RgRadius.smAll,
+                ),
+                child: Text(
+                  sale.invoiceNo,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: RgColors.primary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              _StatusBadge(status: sale.status, large: true),
+            ],
           ),
-          const SizedBox(height: 16),
-          _Row('Date', _fmtDate(sale.sellDate)),
-          _Row('Phone', sale.phone),
-          const Divider(height: 24),
-          _Row('Subtotal', _cur(sale.subtotal)),
-          _Row('Discount', '-${_cur(sale.discount)}',
-              color: const Color(0xFFFF5F5F)),
-          _Row('VAT', '+${_cur(sale.vat)}',
-              color: const Color(0xFFFF9F43)),
-          const Divider(height: 24),
-          _Row('Total', _cur(sale.totalAmount), bold: true),
-          _Row('Paid', _cur(sale.paidAmount),
-              color: const Color(0xFF00C896)),
-          if (sale.dueAmount > 0)
-            _Row('Due', _cur(sale.dueAmount),
-                color: const Color(0xFFFF5F5F), bold: true),
+
           const SizedBox(height: 8),
+          Text(
+            '${sale.customerName}'
+            '${(sale.companyName ?? '').isNotEmpty ? ' · ${sale.companyName}' : ''}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          if (sale.phone.isNotEmpty)
+            Text(
+              sale.phone,
+              style: const TextStyle(fontSize: 12, color: RgColors.muted),
+            ),
+
+          const SizedBox(height: 16),
+          _Row('Sell Date', _fmtDate(sale.sellDate)),
+          if (sale.deliveryDate != null)
+            _Row('Delivery', _fmtDate(sale.deliveryDate!)),
+          _Row('Items', '${sale.totalItems}'),
+
+          const Divider(height: 24, color: RgColors.border),
+          _Row('Sub Total', _cur(sale.subtotal)),
+          if (sale.discount > 0)
+            _Row('Discount', '−${_cur(sale.discount)}', color: RgColors.danger),
+          if (sale.vat > 0)
+            _Row('VAT', '+${_cur(sale.vat)}', color: RgColors.warning),
+
+          const Divider(height: 24, color: RgColors.border),
+          _Row('Total', _cur(sale.totalAmount), bold: true),
+          _Row(
+            'Paid',
+            _cur(sale.paidAmount),
+            color: RgColors.success,
+            bold: true,
+          ),
+          if (sale.dueAmount > 0)
+            _Row(
+              'Due',
+              _cur(sale.dueAmount),
+              color: RgColors.danger,
+              bold: true,
+            ),
         ],
       ),
     );
   }
 
-  Widget _Row(String label, String val,
-      {Color? color, bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        Text(label,
-            style:
-                TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-        const Spacer(),
-        Text(val,
-            style: TextStyle(
+  Widget _Row(String label, String value, {Color? color, bool bold = false}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: RgColors.muted),
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: TextStyle(
                 fontSize: 13,
-                fontWeight:
-                    bold ? FontWeight.w800 : FontWeight.w600,
-                color: color ?? Colors.black87)),
-      ]),
-    );
-  }
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                color: color ?? RgColors.text,
+              ),
+            ),
+          ],
+        ),
+      );
 
   static String _fmtDate(String d) {
     final dt = DateTime.tryParse(d);
@@ -282,7 +490,9 @@ class _SaleDetailSheet extends StatelessWidget {
   static String _cur(double v) => NumberFormat('#,##0.00').format(v);
 }
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Pagination
+// ─────────────────────────────────────────────────────────────
 class _PaginationBar extends StatelessWidget {
   final SalesPagination pagination;
   final int pageSize;
@@ -305,103 +515,111 @@ class _PaginationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final start = currentPage * pagination.pageSize + 1;
-    final end = ((currentPage + 1) * pagination.pageSize)
-        .clamp(0, pagination.totalElements);
+    final end = ((currentPage + 1) * pagination.pageSize).clamp(
+      0,
+      pagination.totalElements,
+    );
 
     return Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: RgColors.surface,
+        borderRadius: RgRadius.lgAll,
+        border: Border.all(color: RgColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.max,
         children: [
-          // Rows per page
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                value: pageSize,
-                isDense: true,
-                items: [10, 20, 50, 100]
-                    .map((v) =>
-                        DropdownMenuItem(value: v, child: Text('$v rows')))
-                    .toList(),
-                onChanged: (v) => v != null ? onPageSizeChanged(v) : null,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87),
-              ),
+          // Record range info
+          Flexible(
+            child: Text(
+              '$start–$end of ${pagination.totalElements}',
+              style: const TextStyle(fontSize: 11, color: RgColors.muted),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
 
-          const SizedBox(width: 10),
-          Text('$start–$end of ${pagination.totalElements}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-
-          const Spacer(),
+          const SizedBox(width: 8),
 
           // Prev
-          _NavBtn(
-              icon: Icons.chevron_left_rounded,
-              onTap: pagination.hasPrevious ? onPreviousPage : null),
+          _PgBtn(
+            icon: Icons.chevron_left_rounded,
+            onTap: pagination.hasPrevious ? onPreviousPage : null,
+          ),
 
-          // Page numbers
-          ..._pages(pagination).map((p) {
+          // Page numbers — max 3 visible
+          ..._visiblePages().map((p) {
             final active = p == currentPage;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: GestureDetector(
                 onTap: () => onPageChanged(p),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 32,
-                  height: 32,
+                  duration: const Duration(milliseconds: 140),
+                  width: 28,
+                  height: 28,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: active
-                        ? const Color(0xFF4C9EFF)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                    color: active ? RgColors.primary : Colors.transparent,
+                    borderRadius: RgRadius.smAll,
+                    border: Border.all(
+                      color: active ? RgColors.primary : RgColors.border,
+                    ),
                   ),
-                  child: Text('${p + 1}',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: active
-                              ? Colors.white
-                              : Colors.grey.shade700)),
+                  child: Text(
+                    '${p + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: active ? Colors.white : RgColors.muted,
+                    ),
+                  ),
                 ),
               ),
             );
           }),
 
           // Next
-          _NavBtn(
-              icon: Icons.chevron_right_rounded,
-              onTap: pagination.hasNext ? onNextPage : null),
+          _PgBtn(
+            icon: Icons.chevron_right_rounded,
+            onTap: pagination.hasNext ? onNextPage : null,
+          ),
+
+          const SizedBox(width: 6),
+
+          // Page x of y
+          Text(
+            '${currentPage + 1}/${pagination.totalPages}',
+            style: const TextStyle(fontSize: 10, color: RgColors.muted),
+          ),
         ],
       ),
     );
   }
 
-  List<int> _pages(SalesPagination p) {
-    const maxP = 5;
-    final total = p.totalPages;
-    var s = (currentPage - 2).clamp(0, total - 1);
-    var e = (s + maxP - 1).clamp(0, total - 1);
-    if (e - s < maxP - 1) s = (e - maxP + 1).clamp(0, total - 1);
+  List<int> _visiblePages() {
+    const max = 3; // keep it tight on mobile
+    final total = pagination.totalPages;
+    if (total == 0) return [];
+    var s = (currentPage - 1).clamp(0, total - 1);
+    var e = (s + max - 1).clamp(0, total - 1);
+    if (e - s < max - 1) s = (e - max + 1).clamp(0, total - 1);
     return List.generate(e - s + 1, (i) => s + i);
   }
 }
 
-class _NavBtn extends StatelessWidget {
-  final IconData icon;
+class _PgBtn extends StatelessWidget {
+  final String? label;
+  final IconData? icon;
   final VoidCallback? onTap;
-  const _NavBtn({required this.icon, required this.onTap});
+  const _PgBtn({this.label, this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -409,112 +627,133 @@ class _NavBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 28,
+        height: 28,
         margin: const EdgeInsets.symmetric(horizontal: 2),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? Colors.grey.shade100 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: RgRadius.smAll,
+          border: Border.all(color: RgColors.border),
         ),
-        child: Icon(icon,
-            size: 18,
-            color:
-                enabled ? Colors.grey.shade700 : Colors.grey.shade300),
+        child: icon != null
+            ? Icon(
+                icon,
+                size: 16,
+                color: enabled ? RgColors.muted : RgColors.border,
+              )
+            : Text(
+                label!,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: enabled ? RgColors.muted : RgColors.border,
+                ),
+              ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-class _FinItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final bool bold;
-
-  const _FinItem({
-    required this.label,
-    required this.value,
-    this.color = Colors.black87,
-    this.bold = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style:
-                TextStyle(fontSize: 9.5, color: Colors.grey.shade400)),
-        Text(value,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    bold ? FontWeight.w800 : FontWeight.w600,
-                color: color)),
-      ],
-    );
-  }
-}
-
+// ─────────────────────────────────────────────────────────────
+// Status badge
+// ─────────────────────────────────────────────────────────────
 class _StatusBadge extends StatelessWidget {
   final String status;
-  const _StatusBadge({required this.status});
+  final bool large;
+  const _StatusBadge({required this.status, this.large = false});
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon) = _cfg(status.toUpperCase());
+    final (fg, bg, bdr) = _cfg(status.toUpperCase());
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.25)),
+      padding: EdgeInsets.symmetric(
+        horizontal: large ? 8 : 5,
+        vertical: large ? 4 : 3,
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: color, size: 11),
-        const SizedBox(width: 4),
-        Text(status,
-            style: TextStyle(
-                fontSize: 10,
-                color: color,
-                fontWeight: FontWeight.w700)),
-      ]),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: RgRadius.fullAll,
+        border: Border.all(color: bdr),
+      ),
+      child: Text(
+        status,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: large ? 11 : 9,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
     );
   }
 
-  (Color, IconData) _cfg(String s) => switch (s) {
-        'DELIVERED' => (const Color(0xFF00C896), Icons.check_circle_rounded),
-        'CONFIRMED' => (const Color(0xFF4C9EFF), Icons.check_circle_outline_rounded),
-        'SHIPPED' => (const Color(0xFF6C63FF), Icons.local_shipping_rounded),
-        'PENDING' => (const Color(0xFFFF9F43), Icons.access_time_rounded),
-        'CANCELLED' => (const Color(0xFFFF5F5F), Icons.cancel_rounded),
-        'PROCESSING' => (const Color(0xFFA78BFA), Icons.autorenew_rounded),
-        _ => (Colors.grey, Icons.circle),
-      };
+  static (Color, Color, Color) _cfg(String s) => switch (s) {
+    'PAID' || 'DELIVERED' => (
+      const Color(0xFF166534),
+      RgColors.successBg,
+      const Color(0xFFBBF7D0),
+    ),
+    'CONFIRMED' => (
+      RgColors.primary,
+      const Color(0xFFEFF6FF),
+      const Color(0xFFBFDBFE),
+    ),
+    'SHIPPED' => (
+      const Color(0xFF155E75),
+      RgColors.infoBg,
+      const Color(0xFFA5F3FC),
+    ),
+    'PENDING' || 'PROCESSING' => (
+      const Color(0xFF92400E),
+      RgColors.warningBg,
+      const Color(0xFFFDE68A),
+    ),
+    'CANCELLED' => (
+      const Color(0xFF991B1B),
+      RgColors.dangerBg,
+      const Color(0xFFFECACA),
+    ),
+    'PARTIAL' => (
+      const Color(0xFF155E75),
+      RgColors.infoBg,
+      const Color(0xFFA5F3FC),
+    ),
+    _ => (RgColors.muted, RgColors.bg, RgColors.border),
+  };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Empty state
+// ─────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Column(children: [
-          Icon(Icons.receipt_long_rounded,
-              size: 48, color: Colors.grey.shade300),
-          const SizedBox(height: 12),
-          Text('No sales found',
+        padding: const EdgeInsets.symmetric(vertical: 56),
+        child: Column(
+          children: const [
+            Icon(Icons.receipt_long_rounded, size: 52, color: RgColors.border),
+            SizedBox(height: 14),
+            Text(
+              'No sales records found',
               style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text('Try adjusting your filters',
-              style: TextStyle(
-                  color: Colors.grey.shade300, fontSize: 12)),
-        ]),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: RgColors.muted,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Try adjusting your filters',
+              style: TextStyle(fontSize: 12, color: RgColors.border),
+            ),
+          ],
+        ),
       ),
     );
   }

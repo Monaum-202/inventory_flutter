@@ -12,7 +12,7 @@ final accessTokenProvider = StateProvider<String?>((ref) {
 final apiServiceProvider = Provider<ApiService>((ref) {
   final token = ref.watch(accessTokenProvider);
     return ApiService(
-    baseUrl: 'http://localhost:9091',
+    baseUrl: 'http://192.168.0.102:9091',
     accessToken: token,
   );
 });

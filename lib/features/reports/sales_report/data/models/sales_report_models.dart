@@ -42,6 +42,28 @@ class SalesSummaryModel extends SalesSummary {
         deliveredAmount: _toDouble(json['deliveredAmount']),
         cancelledAmount: _toDouble(json['cancelledAmount']),
       );
+
+  /// Empty placeholder used when the list endpoint has no summary block.
+  /// Call the /summary endpoint separately to get real values.
+  factory SalesSummaryModel.empty() => const SalesSummaryModel(
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalDiscount: 0,
+    totalVat: 0,
+    netRevenue: 0,
+    averageOrderValue: 0,
+    totalItemsSold: 0,
+    totalCustomers: 0,
+    pendingOrders: 0,
+    confirmedOrders: 0,
+    shippedOrders: 0,
+    deliveredOrders: 0,
+    cancelledOrders: 0,
+    pendingAmount: 0,
+    confirmedAmount: 0,
+    deliveredAmount: 0,
+    cancelledAmount: 0,
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -77,8 +99,13 @@ class SaleDetailModel extends SaleDetail {
         email: _nullIfEmpty(json['email']),
         companyName: _nullIfEmpty(json['companyName']),
         status: json['status'] ?? '',
-        totalItems: json['totalItems'] ?? 0,
-        subtotal: _toDouble(json['subtotal']),
+
+        // ── API sends 'itemCount', entity field is 'totalItems' ──
+        totalItems: json['itemCount'] ?? json['totalItems'] ?? 0,
+
+        // ── API sends 'subTotal' (capital T), entity field is 'subtotal' ──
+        subtotal: _toDouble(json['subTotal'] ?? json['subtotal']),
+
         discount: _toDouble(json['discount']),
         vat: _toDouble(json['vat']),
         totalAmount: _toDouble(json['totalAmount']),
@@ -107,6 +134,19 @@ class SalesPaginationModel extends SalesPagination {
         totalPages: json['totalPages'] ?? 0,
         hasNext: json['hasNext'] ?? false,
         hasPrevious: json['hasPrevious'] ?? false,
+      );
+
+  /// Build from a Spring Page JSON response (flat format).
+  ///
+  /// Spring fields:  number, size, totalElements, totalPages, first, last
+  factory SalesPaginationModel.fromSpringPage(Map<String, dynamic> json) =>
+      SalesPaginationModel(
+        currentPage: json['number'] ?? 0,
+        pageSize: json['size'] ?? 20,
+        totalElements: json['totalElements'] ?? 0,
+        totalPages: json['totalPages'] ?? 0,
+        hasNext: !(json['last'] ?? true),
+        hasPrevious: !(json['first'] ?? true),
       );
 }
 
@@ -139,19 +179,49 @@ class SalesReportModel extends SalesReport {
     super.groupedData,
   });
 
+  // ── Old format: wrapped response  { data: { summary, salesDetails, pagination } }
   factory SalesReportModel.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
+    // Detect Spring Page format: has 'content' key at root level
+    if (json.containsKey('content')) {
+      return SalesReportModel.fromSpringPage(json);
+    }
+
+    // Original wrapped format
+    final data = (json['data'] ?? json) as Map<String, dynamic>;
     return SalesReportModel(
-      summary: SalesSummaryModel.fromJson(data['summary']),
+      summary: SalesSummaryModel.fromJson(
+        data['summary'] as Map<String, dynamic>? ?? {},
+      ),
       salesDetails: (data['salesDetails'] as List? ?? [])
-          .map((e) => SaleDetailModel.fromJson(e))
+          .map((e) => SaleDetailModel.fromJson(e as Map<String, dynamic>))
           .toList(),
-      pagination: SalesPaginationModel.fromJson(data['pagination']),
+      pagination: SalesPaginationModel.fromJson(
+        data['pagination'] as Map<String, dynamic>? ?? {},
+      ),
       groupedData: data['groupedData'] != null
           ? (data['groupedData'] as List)
-              .map((e) => GroupedSalesDataModel.fromJson(e))
-              .toList()
+                .map(
+                  (e) =>
+                      GroupedSalesDataModel.fromJson(e as Map<String, dynamic>),
+                )
+                .toList()
           : null,
+    );
+  }
+
+  // ── Spring Page format: flat response with 'content' list
+  //    { content: [...], totalElements, totalPages, number, size, first, last }
+  factory SalesReportModel.fromSpringPage(Map<String, dynamic> json) {
+    return SalesReportModel(
+      // Summary is not included in the list endpoint.
+      // Use empty() here; load it separately via the /summary endpoint.
+      summary: SalesSummaryModel.empty(),
+
+      salesDetails: (json['content'] as List? ?? [])
+          .map((e) => SaleDetailModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+
+      pagination: SalesPaginationModel.fromSpringPage(json),
     );
   }
 }
@@ -185,8 +255,8 @@ class ProductPerformanceModel extends ProductPerformance {
   });
 
   factory ProductPerformanceModel.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
-    final summary = data['summary'] as Map<String, dynamic>;
+    final data = (json['data'] ?? json) as Map<String, dynamic>;
+    final summary = data['summary'] as Map<String, dynamic>? ?? {};
     return ProductPerformanceModel(
       summary: ProductPerformanceSummary(
         totalUniqueProducts: summary['totalUniqueProducts'] ?? 0,
@@ -194,7 +264,7 @@ class ProductPerformanceModel extends ProductPerformance {
         totalRevenue: _toDouble(summary['totalRevenue']),
       ),
       topProducts: (data['topProducts'] as List? ?? [])
-          .map((e) => TopProductModel.fromJson(e))
+          .map((e) => TopProductModel.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -235,14 +305,14 @@ class CustomerAnalyticsModel extends CustomerAnalytics {
   });
 
   factory CustomerAnalyticsModel.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
-    final summary = data['summary'] as Map<String, dynamic>;
+    final data = (json['data'] ?? json) as Map<String, dynamic>;
+    final summary = data['summary'] as Map<String, dynamic>? ?? {};
     return CustomerAnalyticsModel(
       summary: CustomerAnalyticsSummary(
         totalCustomers: summary['totalCustomers'] ?? 0,
       ),
       topCustomers: (data['topCustomers'] as List? ?? [])
-          .map((e) => TopCustomerModel.fromJson(e))
+          .map((e) => TopCustomerModel.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -250,6 +320,7 @@ class CustomerAnalyticsModel extends CustomerAnalytics {
 
 // ─────────────────────────────────────────────
 // Helpers
+// ─────────────────────────────────────────────
 double _toDouble(dynamic val) {
   if (val == null) return 0.0;
   if (val is double) return val;
